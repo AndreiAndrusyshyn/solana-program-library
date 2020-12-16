@@ -70,7 +70,7 @@ pub enum State {
 
 impl State {
     /// Length of state data when serialized
-    pub const LEN: usize = size_of::<u8>() + size_of::<StakePool>();
+    pub const LEN: usize = size_of::<u8>() + size_of::<StakePool>() +  FINITE_LEN_OF_RECORD;
     /// Deserializes a byte buffer into a [State](struct.State.html).
     /// TODO efficient unpacking here
     pub fn deserialize(input: &[u8]) -> Result<State, ProgramError> {
@@ -97,7 +97,7 @@ impl State {
         match self {
             Self::Unallocated => output[0] = 0,
             Self::Init(swap) => {
-                if output.len() < size_of::<u8>() + size_of::<StakePool>() {
+                if output.len() < size_of::<u8>() + size_of::<StakePool>() + FINITE_LEN_OF_RECORD{
                     return Err(ProgramError::InvalidAccountData);
                 }
                 output[0] = 1;
@@ -117,37 +117,38 @@ impl State {
         }
     }
 }
+const FINITE_LEN_OF_RECORD: usize =  size_of::<ValidatorStakeAccountRecord>()* 100;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct ValidatorStakeAccountsStore {
-    pub validator_stake_accounts: vec![Pubkey],
+pub struct ValidatorStakeAccountRecord {
+    pub validator_stake_accounts: Pubkey,
     pub balance: u64,
     pub balance_update_epoch: u64,
 }
-impl ValidatorStakeAccountsStore {
+impl ValidatorStakeAccountRecord {
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum StoreState {
+pub enum ValidatorStakeAccountsStore {
     Unallocated,
-    Init(ValidatorStakeAccountsStore),
+    Init(vec![ValidatorStakeAccountsStore]),
 }
 
-impl StoreState {
-    pub const LEN: usize = size_of::<u8>() + size_of::<ValidatorStakeAccountsStore>();
+impl ValidatorStakeAccountsStore {
+    pub const LEN: usize = size_of::<u8>() + FINITE_LEN_OF_RECORD;
 
-    pub fn deserialize(input: &[u8]) -> Result<StoreState, ProgramError> {
+    pub fn deserialize(input: &[u8]) -> Result<ValidatorStakeAccountsStore, ProgramError> {
         if input.len() < size_of::<u8>() {
             return Err(ProgramError::InvalidAccountData);
         }
         Ok(match input[0] {
-            0 => StoreState::Unallocated,
+            0 => ValidatorStakeAccountsStore::Unallocated,
             1 => {
                 // We send whole input here, because unpack skips the first byte
-                let swap: Box<ValidatorStakeAccountsStore> = unpack(&input)?;
-                StoreState::Init(*swap)
+                let swap: Box<ValidatorStakeAccountRecord> = unpack(&input)?;
+                ValidatorStakeAccountsStore::Init(*swap)
             }
             _ => return Err(ProgramError::InvalidAccountData),
         })
@@ -160,20 +161,20 @@ impl StoreState {
         match self {
             Self::Unallocated => output[0] = 0,
             Self::Init(swap) => {
-                if output.len() < size_of::<u8>() + size_of::<ValidatorStakeAccountsStore>() {
+                if output.len() < size_of::<u8>() + size_of::<ValidatorStakeAccountRecord>() {
                     return Err(ProgramError::InvalidAccountData);
                 }
                 output[0] = 1;
                 #[allow(clippy::cast_ptr_alignment)]
-                    let value = unsafe { &mut *(&mut output[1] as *mut u8 as *mut ValidatorStakeAccountsStore) };
+                    let value = unsafe { &mut *(&mut output[1] as *mut u8 as *mut ValidatorStakeAccountRecord) };
                 *value = *swap;
             }
         }
         Ok(())
     }
 
-    pub fn validator_accounts_store(&self) -> Result<ValidatorStakeAccountsStore, ProgramError> {
-        if let StoreState::Init(swap) = &self {
+    pub fn validator_accounts_store(&self) -> Result<ValidatorStakeAccountRecord, ProgramError> {
+        if let ValidatorStakeAccountsStore::Init(swap) = &self {
             Ok(*swap)
         } else {
             Err(Error::InvalidState.into())

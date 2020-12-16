@@ -8,6 +8,7 @@ use solana_program::program_error::ProgramError;
 use solana_program::pubkey::Pubkey;
 use solana_program::sysvar;
 use std::mem::size_of;
+use crate::state::ValidatorStakeAccountRecord;
 
 /// Fee rate as a ratio
 /// Fee is minted on deposit
@@ -26,6 +27,7 @@ pub struct Fee {
 pub struct InitArgs {
     /// Fee paid to the owner in pool tokens
     pub fee: Fee,
+    pub store_account: ValidatorStakeAccountRecord,
 }
 
 /// Instructions supported by the StakePool program.

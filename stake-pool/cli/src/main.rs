@@ -35,7 +35,7 @@ use spl_stake_pool::{
     stake::StakeAuthorize,
     state::StakePool,
     state::State as PoolState,
-    state::StoreState as ValidatorStore
+    state::ValidatorStakeAccountsStore as ValidatorStore
 };
 use spl_token::{
     self, instruction::approve as approve_token, instruction::initialize_account,
