@@ -20,6 +20,8 @@ pub struct StakePool {
     pub withdraw_bump_seed: u8,
     /// Pool Mint
     pub pool_mint: Pubkey,
+    ///
+    pub store_account: Pubkey,
     /// Owner fee account
     pub owner_fee_account: Pubkey,
     /// Pool token program id
@@ -109,6 +111,69 @@ impl State {
     /// Gets the `StakePool` from `State`
     pub fn stake_pool(&self) -> Result<StakePool, ProgramError> {
         if let State::Init(swap) = &self {
+            Ok(*swap)
+        } else {
+            Err(Error::InvalidState.into())
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ValidatorStakeAccountsStore {
+    pub validator_stake_accounts: vec![Pubkey],
+    pub balance: u64,
+    pub balance_update_epoch: u64,
+}
+impl ValidatorStakeAccountsStore {
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StoreState {
+    Unallocated,
+    Init(ValidatorStakeAccountsStore),
+}
+
+impl StoreState {
+    pub const LEN: usize = size_of::<u8>() + size_of::<ValidatorStakeAccountsStore>();
+
+    pub fn deserialize(input: &[u8]) -> Result<StoreState, ProgramError> {
+        if input.len() < size_of::<u8>() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        Ok(match input[0] {
+            0 => StoreState::Unallocated,
+            1 => {
+                // We send whole input here, because unpack skips the first byte
+                let swap: Box<ValidatorStakeAccountsStore> = unpack(&input)?;
+                StoreState::Init(*swap)
+            }
+            _ => return Err(ProgramError::InvalidAccountData),
+        })
+    }
+
+    pub fn serialize(&self, output: &mut [u8]) -> ProgramResult {
+        if output.len() < size_of::<u8>() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        match self {
+            Self::Unallocated => output[0] = 0,
+            Self::Init(swap) => {
+                if output.len() < size_of::<u8>() + size_of::<ValidatorStakeAccountsStore>() {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                output[0] = 1;
+                #[allow(clippy::cast_ptr_alignment)]
+                    let value = unsafe { &mut *(&mut output[1] as *mut u8 as *mut ValidatorStakeAccountsStore) };
+                *value = *swap;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn validator_accounts_store(&self) -> Result<ValidatorStakeAccountsStore, ProgramError> {
+        if let StoreState::Init(swap) = &self {
             Ok(*swap)
         } else {
             Err(Error::InvalidState.into())

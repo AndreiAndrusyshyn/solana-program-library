@@ -173,6 +173,7 @@ impl Processor {
         let pool_mint_info = next_account_info(account_info_iter)?;
         let owner_fee_info = next_account_info(account_info_iter)?;
         let token_program_info = next_account_info(account_info_iter)?;
+        let store_account = next_account_info(account_info_iter)?;
 
         // Stake pool account should not be already initialized
         if State::Unallocated != State::deserialize(&stake_pool_info.data.borrow())? {
@@ -211,6 +212,8 @@ impl Processor {
             stake_total: 0,
             pool_total: 0,
             fee: init.fee,
+            store_account: *store_account.key,
+
         });
         stake_pool.serialize(&mut stake_pool_info.data.borrow_mut())
     }

@@ -74,7 +74,7 @@ pub enum StakePoolInstruction {
 
     ///   Claim ownership of a whole stake account.
     ///   Also burns enough tokens to make up for the stake account balance
-    ///   
+    ///
     ///   0. `[w]` Stake pool
     ///   1. `[]` Stake pool withdraw authority
     ///   2. `[w]` Stake account to claim
@@ -182,15 +182,18 @@ pub fn initialize(
     pool_mint: &Pubkey,
     owner_pool_account: &Pubkey,
     token_program_id: &Pubkey,
+    store_account: &Pubkey,
     init_args: InitArgs,
 ) -> Result<Instruction, ProgramError> {
     let init_data = StakePoolInstruction::Initialize(init_args);
     let data = init_data.serialize()?;
+
     let accounts = vec![
         AccountMeta::new(*stake_pool, true),
         AccountMeta::new_readonly(*owner, false),
         AccountMeta::new_readonly(*pool_mint, false),
         AccountMeta::new_readonly(*owner_pool_account, false),
+        AccountMeta::new(*store_account, false),
         AccountMeta::new_readonly(*token_program_id, false),
     ];
     Ok(Instruction {

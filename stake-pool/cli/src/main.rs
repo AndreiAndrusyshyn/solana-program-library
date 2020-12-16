@@ -35,6 +35,7 @@ use spl_stake_pool::{
     stake::StakeAuthorize,
     state::StakePool,
     state::State as PoolState,
+    state::StoreState as ValidatorStore
 };
 use spl_token::{
     self, instruction::approve as approve_token, instruction::initialize_account,
@@ -128,6 +129,8 @@ fn command_create_pool(config: &Config, fee: PoolFee) -> CommandResult {
     let pool_account = Keypair::new();
     println!("Creating stake pool {}", pool_account.pubkey());
 
+    let store_account = Keypair::new();
+
     let mint_account_balance = config
         .rpc_client
         .get_minimum_balance_for_rent_exemption(TokenMint::LEN)?;
@@ -179,6 +182,14 @@ fn command_create_pool(config: &Config, fee: PoolFee) -> CommandResult {
                 PoolState::LEN as u64,
                 &spl_stake_pool::id(),
             ),
+            // Account for the validators store
+            system_instruction::create_account(
+                &config.fee_payer.pubkey(),
+                &store_account.pubkey(),
+                pool_account_balance,
+                ValidatorStore::LEN * 100 as u64,
+                &spl_stake_pool::id(),
+            ),
             // Initialize pool token mint account
             initialize_mint(
                 &spl_token::id(),
@@ -202,7 +213,9 @@ fn command_create_pool(config: &Config, fee: PoolFee) -> CommandResult {
                 &mint_account.pubkey(),
                 &pool_fee_account.pubkey(),
                 &spl_token::id(),
+                &store_account.pubkey(),
                 PoolInitArgs { fee },
+
             )?,
         ],
         Some(&config.fee_payer.pubkey()),
